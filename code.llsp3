@@ -1,0 +1,723 @@
+from hub import motion_sensor,port,sound
+import motor, motor_pair, runloop, distance_sensor, color_sensor,distance_sensor
+import time, color, motor
+
+
+rightDriveMotor = port.D
+leftDriveMotor = port.A
+motor_pair.pair(motor_pair.PAIR_1, leftDriveMotor, rightDriveMotor)
+
+
+async def curved_road_linefollowing_task2(kp,speed):
+    colorSensorRight = port.E
+    colorSensorLeft = port.C
+
+    base_speed = speed# Adjust this for your robot’s optimal speed
+    kp = (kp)# Proportional gain - tune this value for smooth control
+
+    
+    while color_sensor.reflection(port.C) >= 20 or color_sensor.reflection(port.E) >= 20:            
+        left_reflection = color_sensor.reflection(colorSensorLeft)# Get light intensity
+        right_reflection = color_sensor.reflection(colorSensorRight)
+
+        error = left_reflection - right_reflection# Difference between sensor readings
+        adjustment = kp * error# Proportional control
+
+        left_speed = base_speed + adjustment# Adjust left wheel speed
+        right_speed = base_speed - adjustment# Adjust right wheel speed
+
+            # Ensure speeds stay within motor limits
+        left_speed = max(0, min(1000, left_speed))
+        right_speed = max(0, min(1000, right_speed))
+
+        motor_pair.move_tank(motor_pair.PAIR_1,left_speed,right_speed)# Move with adjusted speeds
+        time.sleep_ms(0)
+
+    motor_pair.stop(motor_pair.PAIR_1)# Stop after the time runs out
+
+
+
+async def curved_road_linefollowing2(seconds,kp,speed):
+    colorSensorRight = port.E
+    colorSensorLeft = port.C
+
+    base_speed = speed# Adjust this for your robot’s optimal speed
+    kp = (kp)# Proportional gain - tune this value for smooth control
+
+    start_time = time.ticks_ms()
+    while time.ticks_ms() - start_time < seconds * 1000:# Convert seconds to milliseconds
+        left_reflection = color_sensor.reflection(colorSensorLeft)# Get light intensity
+        right_reflection = color_sensor.reflection(colorSensorRight)
+
+        error = left_reflection - right_reflection# Difference between sensor readings
+        adjustment = kp * error# Proportional control
+
+        left_speed = base_speed + adjustment# Adjust left wheel speed
+        right_speed = base_speed - adjustment# Adjust right wheel speed
+
+        # Ensure speeds stay within motor limits
+        left_speed = max(0, min(1000, left_speed))
+        right_speed = max(0, min(1000, right_speed))
+
+        motor_pair.move_tank(motor_pair.PAIR_1,left_speed,right_speed)# Move with adjusted speeds
+        time.sleep_ms(0)
+
+    motor_pair.stop(motor_pair.PAIR_1)# Stop after the time runs out
+
+
+
+
+
+
+async def line_following_task_intersection_turn(kp,ki,kd,intersections,velocity,turn):
+    colorSensorRight = port.E
+    colorSensorLeft = port.C
+    kp =float (kp)
+    ki = float(ki)
+    kd = float(kd)
+    lasterror = float(0)
+    intergral = float(0)
+    error = float(0)
+    derivative = float(0)
+    correction = float(0)
+    intersection_count = 0
+    while intersection_count < intersections:
+        error = color_sensor.reflection(colorSensorLeft) - color_sensor.reflection(colorSensorRight)
+        integral = error + intergral
+        derivative = error - lasterror
+        correction = ((error * kp) + (integral *ki) + (derivative * kd))
+        levelocity = int(velocity)+ int(correction)
+        rivelcoity = int(velocity) - int(correction)
+        motor_pair.move_tank(motor_pair.PAIR_1, levelocity,rivelcoity)
+        lasterror = error
+        if color_sensor.color(colorSensorLeft) == color.BLACK and color_sensor.color(colorSensorRight) == color.BLACK:
+            intersection_count = intersection_count + 1
+            print("intersection reached")
+
+            # Move forward a bit to avoid counting the same intersection again
+            if intersection_count < intersections and intersections > 1:
+                await motor_pair.move_tank_for_degrees(motor_pair.PAIR_1, 100, 500, 500)
+            
+            if intersection_count == intersections:
+                await motor_pair.move_tank_for_degrees(motor_pair.PAIR_1, 60, 500, 500)
+                if turn == 1:
+                    motion_sensor.reset_yaw(0)
+                    runloop.run(movement(1,500,500))
+                    runloop.run(left(850))
+                elif turn == 2:
+                    motion_sensor.reset_yaw(0)
+                    runloop.run(movement(1,500,500))
+                    runloop.run(turnright(850))
+                    time.sleep_ms(300)
+
+    motor_pair.stop(motor_pair.PAIR_1)
+    print("final intersection reached")
+
+
+
+
+
+async def line_following_task_intersection(kp,ki,kd,intersections,velocity):
+    colorSensorRight = port.E
+    colorSensorLeft = port.C
+    kp =float (kp)
+    ki = float(ki)
+    kd = float(kd)
+    lasterror = float(0)
+    intergral = float(0)
+    error = float(0)
+    derivative = float(0)
+    correction = float(0)
+    intersection_count = 0
+    while intersection_count < intersections:
+        error = color_sensor.reflection(colorSensorLeft) - color_sensor.reflection(colorSensorRight)
+        integral = error + intergral
+        derivative = error - lasterror
+        correction = ((error * kp) + (integral *ki) + (derivative * kd))
+        levelocity = int(velocity)+ int(correction)
+        rivelcoity = int(velocity) - int(correction)
+        motor_pair.move_tank(motor_pair.PAIR_1, levelocity,rivelcoity)
+        lasterror = error
+        if color_sensor.color(colorSensorLeft) == color.BLACK and color_sensor.color(colorSensorRight) == color.BLACK:
+            intersection_count = intersection_count + 1
+            print("intersection reached")
+
+            # Move forward a bit to avoid counting the same intersection again
+            if intersection_count < intersections and intersections > 1:
+                runloop.run(gyro_straight(100,500,1))
+
+    motor_pair.stop(motor_pair.PAIR_1)
+    print("final intersection reached")
+
+
+
+async def package_dropped_sound():
+    sound.beep(80000,500,500)
+
+async def obstacle_detection():
+    while distance_sensor.distance(port.F) >=  50 or distance_sensor.distance(port.F) == 200:        
+        motor_pair.move_tank(motor_pair.PAIR_1,300,300)
+    motor_pair.stop(motor_pair.PAIR_1)
+
+ 
+
+async def package_detection():
+    while distance_sensor.distance(port.F) >=50 or distance_sensor.distance(port.F) == 200:
+        motor_pair.move_tank(motor_pair.PAIR_1,600,600)
+    motor_pair.stop(motor_pair.PAIR_1)
+    runloop.run(movement(80,500,500))
+
+async def gyro_straight(seconds,speed,gain):
+    motion_sensor.reset_yaw(0)
+    start_time=time.ticks_ms()
+    while time.ticks_ms() - start_time < seconds:
+        error=motion_sensor.tilt_angles()[0]*-0.1
+        correction= int((error*gain)*-1)
+        #error2=motion_sensor.tilt_angles()[0]
+        #correction2 = max(-100, min(100, int(-error2 * gain)))
+        motor_pair.move(motor_pair.PAIR_1,correction,velocity=speed)
+    motor_pair.stop(motor_pair.PAIR_1,stop=motor.SMART_BRAKE)
+
+async def movement(degrees,leftvelocity,rightvelocity):#define moving forward
+    await motor_pair.move_tank_for_degrees(motor_pair.PAIR_1,degrees,leftvelocity,rightvelocity)
+
+async def ultrasonic_light_blink(seconds):
+    start_time=time.ticks_ms()
+    while time.ticks_ms() - start_time < seconds:
+      time.sleep_ms(10)      
+      distance_sensor.show(port.F, [100, 0, 100, 0])# Brightness levels for all 4 LEDs
+      time.sleep_ms(10)
+      distance_sensor.show(port.F, [0, 100, 0, 100])# Brightness levels for all 4 LEDs
+      time.sleep_ms(10)
+      distance_sensor.show(port.F, [100, 100, 100, 100])# Brightness levels for all 4 LEDs
+    distance_sensor.show(port.F, [0, 0, 0, 0])# Brightness levels for all 4 LEDs
+    
+
+
+async def line_following_task(kp,ki,kd,seconds,velocity):#define 2 sensor line following
+    colorSensorRight = port.E
+    colorSensorLeft = port.C
+    kp =float (kp)
+    ki = float(ki)
+    kd = float(kd)
+    lasterror = float(0)
+    intergral = float(0)
+    error = float(0)
+    derivative = float(0)
+    correction = float(0)
+    start_time = time.ticks_ms()
+    while time.ticks_ms() - start_time < seconds:
+        error = color_sensor.reflection(colorSensorLeft) - color_sensor.reflection(colorSensorRight)
+        integral = error + intergral
+        derivative = error - lasterror
+        correction = ((error * kp) + (integral *ki) + (derivative * kd))
+        levelocity = int(velocity)  + int(correction)
+        rivelcoity = int(velocity) - int(correction)
+        motor_pair.move_tank(motor_pair.PAIR_1, levelocity,rivelcoity)
+        lasterror = error
+    motor_pair.stop(motor_pair.PAIR_1)
+
+
+
+async def curved_road_linefollowing(seconds):
+    colorSensorRight = port.E
+    colorSensorLeft = port.C
+    start_time = time.ticks_ms()
+    while time.ticks_ms() - start_time < seconds * 1000:# Convert seconds to milliseconds
+        if color_sensor.color(colorSensorLeft) == color.BLACK:
+            motor_pair.move_tank_for_degrees(motor_pair.PAIR_1,seconds, 0,900)
+        elif color_sensor.color(colorSensorRight) == color.BLACK:
+            motor_pair.move_tank_for_degrees(motor_pair.PAIR_1,seconds, 900,0)
+        elif color_sensor.color(colorSensorLeft) == color.WHITE and color_sensor.color(colorSensorRight) == color.WHITE:
+            motor_pair.move_tank_for_degrees(motor_pair.PAIR_1,seconds, 900,900)
+
+
+
+    #motor_pair.stop(motor_pair.PAIR_1)
+
+async def turnright(degrees):
+
+    #turn right 90 degrees
+ while motion_sensor.tilt_angles()[0]>-degrees: #getting yaw value from tuple
+        motor_pair.move(motor_pair.PAIR_1,100,velocity=400) #move to right
+ motor_pair.stop(motor_pair.PAIR_1) #stop motor
+
+
+
+
+
+async def left(degrees):
+    #turn left 90 degrees
+ while motion_sensor.tilt_angles()[0]<degrees: #getting yaw value from tuple
+        motor_pair.move(motor_pair.PAIR_1,-100,velocity=400) #move to left
+ motor_pair.stop(motor_pair.PAIR_1) #stop motor
+
+async def close_grabber(speed,degrees):
+   await motor.run_for_degrees(port.B,degrees,speed,stop=motor.HOLD)
+
+
+async def line_following_multiple_intersection_turns(kp,ki,kd,velocity,intersection_1,turn_1,intersection_2,turn_2,intersection_3,turn_3,intersection_4,turn_4):
+    colorSensorRight = port.E
+    colorSensorLeft = port.C
+    kp =float (kp)
+    ki = float(ki)
+    kd = float(kd)
+    lasterror = float(0)
+    intergral = float(0)
+    error = float(0)
+    derivative = float(0)
+    correction = float(0)
+
+
+
+    intersection_count = 0
+    while intersection_count < intersection_1:
+        error = color_sensor.reflection(colorSensorLeft) - color_sensor.reflection(colorSensorRight)
+        integral = error + intergral
+        derivative = error - lasterror
+        correction = ((error * kp) + (integral *ki) + (derivative * kd))
+        levelocity = int(velocity)+ int(correction)
+        rivelcoity = int(velocity) - int(correction)
+        motor_pair.move_tank(motor_pair.PAIR_1, levelocity,rivelcoity)
+        lasterror = error
+        if color_sensor.color(colorSensorLeft) == color.BLACK and color_sensor.color(colorSensorRight) == color.BLACK:
+            intersection_count = intersection_count + 1
+
+            # Move forward a bit to avoid counting the same intersection again
+            if intersection_count < intersection_1 and intersection_1 > 1:
+                await motor_pair.move_tank_for_degrees(motor_pair.PAIR_1, 100, 500, 500)
+
+            if intersection_count == intersection_1:
+                await motor_pair.move_tank_for_degrees(motor_pair.PAIR_1, 60, 500, 500)
+                if turn_1 == 1:
+                    motion_sensor.reset_yaw(0)
+                    runloop.run(movement(1,500,500))
+                    runloop.run(left(850))
+                    time.sleep_ms(300)
+                elif turn_1 == 2:
+                    motion_sensor.reset_yaw(0)
+                    runloop.run(movement(1,500,500))
+                    runloop.run(turnright(850))
+                    time.sleep_ms(300)
+                elif turn_1 == 0:
+                    pass
+    motor_pair.stop(motor_pair.PAIR_1)
+
+
+
+    intersection_count2 = 0
+    while intersection_count2 < intersection_2:
+        error = color_sensor.reflection(colorSensorLeft) - color_sensor.reflection(colorSensorRight)
+        integral = error + intergral
+        derivative = error - lasterror
+        correction = ((error * kp) + (integral *ki) + (derivative * kd))
+        levelocity = int(velocity)+ int(correction)
+        rivelcoity = int(velocity) - int(correction)
+        motor_pair.move_tank(motor_pair.PAIR_1, levelocity,rivelcoity)
+        lasterror = error
+        if color_sensor.color(colorSensorLeft) == color.BLACK and color_sensor.color(colorSensorRight) == color.BLACK:
+            intersection_count2 = intersection_count2 + 1
+
+            # Move forward a bit to avoid counting the same intersection again
+            if intersection_count2 < intersection_2 and intersection_2 > 1:
+                await motor_pair.move_tank_for_degrees(motor_pair.PAIR_1, 100, 500, 500)
+
+            if intersection_count2 == intersection_2:
+                await motor_pair.move_tank_for_degrees(motor_pair.PAIR_1, 60, 500, 500)
+                if turn_2 == 1:
+                    motion_sensor.reset_yaw(0)
+                    runloop.run(movement(1,500,500))
+                    runloop.run(left(850))
+                    time.sleep_ms(300)
+                elif turn_2 == 2:
+                    motion_sensor.reset_yaw(0)
+                    runloop.run(movement(1,500,500))
+                    runloop.run(turnright(850))
+                    time.sleep_ms(300)
+                elif turn_2 == 0:
+                    pass
+    motor_pair.stop(motor_pair.PAIR_1)
+
+
+
+    intersection_count3 = 0
+    while intersection_count3 < intersection_3:
+        error = color_sensor.reflection(colorSensorLeft) - color_sensor.reflection(colorSensorRight)
+        integral = error + intergral
+        derivative = error - lasterror
+        correction = ((error * kp) + (integral *ki) + (derivative * kd))
+        levelocity = int(velocity)+ int(correction)
+        rivelcoity = int(velocity) - int(correction)
+        motor_pair.move_tank(motor_pair.PAIR_1, levelocity,rivelcoity)
+        lasterror = error
+        if color_sensor.color(colorSensorLeft) == color.BLACK and color_sensor.color(colorSensorRight) == color.BLACK:
+            intersection_count3 = intersection_count3 + 1
+
+            # Move forward a bit to avoid counting the same intersection again
+            if intersection_count3 < intersection_3 and intersection_3 > 1:
+                await motor_pair.move_tank_for_degrees(motor_pair.PAIR_1, 100, 500, 500)
+
+            if intersection_count3 == intersection_3:
+                await motor_pair.move_tank_for_degrees(motor_pair.PAIR_1, 60, 500, 500)
+                if turn_3 == 1:
+                    motion_sensor.reset_yaw(0)
+                    runloop.run(movement(1,500,500))
+                    runloop.run(left(850))
+                    time.sleep_ms(300)
+
+                elif turn_3 == 2:
+                    motion_sensor.reset_yaw(0)
+                    runloop.run(movement(1,500,500))
+                    runloop.run(turnright(850))
+                    time.sleep_ms(300)
+                elif turn_3 == 0:
+                    pass
+    motor_pair.stop(motor_pair.PAIR_1)
+
+
+
+
+    intersection_count4 = 0
+    while intersection_count4 < intersection_4:
+        error = color_sensor.reflection(colorSensorLeft) - color_sensor.reflection(colorSensorRight)
+        integral = error + intergral
+        derivative = error - lasterror
+        correction = ((error * kp) + (integral *ki) + (derivative * kd))
+        levelocity = int(velocity)+ int(correction)
+        rivelcoity = int(velocity) - int(correction)
+        motor_pair.move_tank(motor_pair.PAIR_1, levelocity,rivelcoity)
+        lasterror = error
+        if color_sensor.color(colorSensorLeft) == color.BLACK and color_sensor.color(colorSensorRight) == color.BLACK:
+            intersection_count4 = intersection_count4 + 1
+
+            # Move forward a bit to avoid counting the same intersection again
+            if intersection_count4 < intersection_4 and intersection_4 > 1:
+                await motor_pair.move_tank_for_degrees(motor_pair.PAIR_1, 100, 500, 500)
+
+            if intersection_count4 == intersection_4:
+                await motor_pair.move_tank_for_degrees(motor_pair.PAIR_1, 60, 500, 500)
+                if turn_4 == 1:
+                    motion_sensor.reset_yaw(0)
+                    runloop.run(movement(1,500,500))
+                    runloop.run(left(850))
+                    time.sleep_ms(300)
+                elif turn_4 == 2:
+                    motion_sensor.reset_yaw(0)
+                    runloop.run(movement(1,500,500))
+                    runloop.run(turnright(850))
+                    time.sleep_ms(300)
+                elif turn_4 == 0:
+                    pass
+    motor_pair.stop(motor_pair.PAIR_1)
+
+async def onsite_grab(number):
+    if number == 1:
+        motion_sensor.reset_yaw(0)
+        runloop.run(movement(1,500,500))
+        runloop.run(left(480))
+        time.sleep_ms(200)
+        runloop.run(movement(170,500,500))
+        runloop.run(close_grabber(100,-200))
+        motion_sensor.reset_yaw(0)
+        runloop.run(movement(170,-500,-500))
+        runloop.run(turnright(480))
+        motion_sensor.reset_yaw(0)
+        runloop.run(movement(1,500,500))
+        runloop.run(turnright(1700))
+    elif number == 2:
+        motion_sensor.reset_yaw(0)
+        runloop.run(movement(1,500,500))
+        runloop.run(left(120))
+        time.sleep_ms(200)
+        runloop.run(movement(170,500,500))
+        runloop.run(close_grabber(100,-200))
+        motion_sensor.reset_yaw(0)
+        runloop.run(movement(170,-500,-500))
+        runloop.run(turnright(120))
+        motion_sensor.reset_yaw(0)
+        runloop.run(movement(1,500,500))
+        runloop.run(turnright(1700))    
+    elif number == 3:
+        motion_sensor.reset_yaw(0)
+        runloop.run(movement(1,500,500))
+        runloop.run(turnright(120))
+        time.sleep_ms(200)
+        runloop.run(movement(170,500,500))
+        runloop.run(close_grabber(100,-200))
+        motion_sensor.reset_yaw(0)
+        runloop.run(movement(170,-500,-500))
+        runloop.run(left(120))
+        motion_sensor.reset_yaw(0)
+        runloop.run(movement(1,500,500))
+        runloop.run(turnright(1700))
+    elif number == 4:
+        motion_sensor.reset_yaw(0)
+        runloop.run(movement(1,500,500))
+        runloop.run(turnright(480))
+        time.sleep_ms(200)
+        runloop.run(movement(170,500,500))
+        runloop.run(close_grabber(100,-200))
+        motion_sensor.reset_yaw(0)
+        runloop.run(movement(170,-500,-500))
+        runloop.run(left(480))
+        motion_sensor.reset_yaw(0)
+        runloop.run(movement(1,500,500))
+        runloop.run(turnright(1700))
+
+async def get_out_of_reset(number):
+    if number == 1:
+        time.sleep_ms(200)
+        motion_sensor.reset_yaw(0)
+        runloop.run(movement(330,500,500))
+        runloop.run(left(850))
+        time.sleep_ms(200)
+        runloop.run(movement(350,500,500))
+    elif number == 2:
+        time.sleep_ms(200)
+        motion_sensor.reset_yaw(0)
+        runloop.run(movement(330,500,500))
+        runloop.run(turnright(850))
+        time.sleep_ms(200)
+        runloop.run(movement(350,500,500))
+
+ 
+
+async def start_to_c3_through_reset():
+    runloop.run(close_grabber(200,250))
+    runloop.run(gyro_straight(560,500,1))
+    runloop.run(curved_road_linefollowing(7))
+    runloop.run(line_following_task_intersection(1,0.01,0,2,600))
+    runloop.run(gyro_straight(1450,600,1.2))
+    runloop.run(turnright(10))
+    motion_sensor.reset_yaw(0)
+    runloop.run(line_following_task(1,0.01,1.5,600,600))
+    runloop.run(left(280))
+    runloop.run(curved_road_linefollowing(8))
+    motion_sensor.reset_yaw(0)
+    runloop.run(movement(40,500,500))
+    runloop.run(left(850))
+    time.sleep_ms(200)
+    runloop.run(line_following_task_intersection(1,0.01,0,1,600))
+    runloop.run(movement(60,500,500))
+    runloop.run(close_grabber(-200,210))
+    motion_sensor.reset_yaw(0)
+    runloop.run(movement(200,-500,-500))
+    runloop.run(left(850))
+    motion_sensor.reset_yaw(0)
+    runloop.run(movement(1,500,500))
+    runloop.run(left(850))
+    time.sleep_ms(200)
+    motion_sensor.reset_yaw(0)
+    runloop.run(line_following_task_intersection(1,0.01,0,1,600))
+    runloop.run(movement(100,500,500))
+    time.sleep_ms(200)
+    runloop.run(turnright(850))
+    runloop.run(curved_road_linefollowing(9))
+    runloop.run(gyro_straight(2000,700,1))
+
+async def b1_to_a3():
+    runloop.run(gyro_straight(560,500,0.7))
+    motion_sensor.reset_yaw(0)
+    runloop.run(curved_road_linefollowing(5))
+    runloop.run(left(350))
+    time.sleep_ms(200)
+    runloop.run(line_following_task_intersection(2,0.01,0.7,1,500))
+    runloop.run(movement(100,500,500))
+    runloop.run(close_grabber(-200,300))
+    motion_sensor.reset_yaw(0)
+    runloop.run(movement(0,-700,-700))
+    runloop.run(left(850))
+    motion_sensor.reset_yaw(0)
+    runloop.run(movement(1,700,700))
+    runloop.run(left(850))
+    time.sleep_ms(200)
+    motion_sensor.reset_yaw(0)
+    runloop.run(line_following_task_intersection(2,0.01,0.7,1,700))
+    runloop.run(movement(10,700,700))
+    time.sleep_ms(200)
+    runloop.run(left(400))
+    time.sleep_ms(200)
+    runloop.run(movement(100,700,700))
+    runloop.run(line_following_task_intersection(2,0.01,0.7,2,700))
+    motion_sensor.reset_yaw(0)
+    runloop.run(movement(60,700,700))
+    runloop.run(turnright(850))
+    time.sleep_ms(300)
+    runloop.run(line_following_task_intersection(2,0.01,0.7,1,700))
+    motion_sensor.reset_yaw(0)
+    runloop.run(movement(60,700,700))
+    runloop.run(turnright(850))
+    time.sleep_ms(200)
+    runloop.run(line_following_task_intersection(2,0.01,0.7,1,700))
+    runloop.run(movement(90,700,700))
+    runloop.run(close_grabber(200,200))
+    time.sleep_ms(300)
+    motion_sensor.reset_yaw(0)
+    runloop.run(movement(200,-700,-700))
+    runloop.run(left(850))
+    motion_sensor.reset_yaw(0)
+    runloop.run(movement(1,700,700))
+    runloop.run(left(850))
+    time.sleep_ms(200)
+    motion_sensor.reset_yaw(0)
+    runloop.run(line_following_task_intersection(2,0.01,0.7,1,700))
+    runloop.run(movement(50,700,700))
+    runloop.run(turnright(850))
+    time.sleep_ms(200)
+    runloop.run(line_following_task_intersection(2,0.01,0.7,1,700))
+    runloop.run(gyro_straight(500,700,1))
+
+
+async def start_to_c3():
+    runloop.run(close_grabber(-200,100))
+    runloop.run(gyro_straight(600,500,0.7))
+    motion_sensor.reset_yaw(0)
+    runloop.run(curved_road_linefollowing(5))
+    runloop.run(turnright(860))
+    runloop.run(movement(200,500,500))
+    runloop.run(line_following_task(2,0.01,0.7,600,700))
+    runloop.run(line_following_task_intersection(1,0.01,0.7,2,700))
+    motion_sensor.reset_yaw(0)
+    runloop.run(movement(100,500,500))
+    runloop.run(line_following_task(1,0.01,1.5,1100,700))
+    runloop.run(left(300))
+    runloop.run(curved_road_linefollowing(12))
+    motion_sensor.reset_yaw(0)
+    runloop.run(movement(20,500,500))
+    runloop.run(turnright(750))
+    time.sleep_ms(300)
+    runloop.run(line_following_task_intersection(1,0.01,1.5,1,700)) 
+    runloop.run(movement(70,500,500))
+    motion_sensor.reset_yaw(0)
+    runloop.run(close_grabber(200,200))
+    motion_sensor.reset_yaw(0)
+    runloop.run(movement(190,-500,-500))
+    runloop.run(turnright(1700))
+    time.sleep_ms(200)
+    runloop.run(line_following_task_intersection(2,0.01,1.5,1,700))
+    motion_sensor.reset_yaw(0)
+    runloop.run(movement(70,500,500))
+    time.sleep_ms(200)
+    runloop.run(turnright(850))
+    time.sleep_ms(200)
+    runloop.run(movement(1,500,500))
+    time.sleep_ms(200)
+    motion_sensor.reset_yaw(0)
+    runloop.run(curved_road_linefollowing(7))
+    motion_sensor.reset_yaw(0)
+    runloop.run(movement(150,500,500))
+    runloop.run(turnright(340))
+    time.sleep_ms(300)
+    runloop.run(gyro_straight(2600,700,1))
+
+    
+     
+async def start_to_c3_fast():
+    runloop.run(close_grabber(-200,100))
+    runloop.run(gyro_straight(600,600,0.7))
+    runloop.run(curved_road_linefollowing2(0.9,13,1000))#1.4,8,700
+    motion_sensor.reset_yaw(0)
+    time.sleep_ms(200)
+    runloop.run(line_following_task_intersection(1.6,0.1,0,2,700))
+    runloop.run(movement(40,700,700))
+    runloop.run(line_following_task(2,0.1,0,1160,700))
+    motion_sensor.reset_yaw(0)
+    runloop.run(movement(1,700,700))
+    runloop.run(left(320))
+    time.sleep_ms(300)
+    runloop.run(movement(50,500,500))
+    runloop.run(curved_road_linefollowing2(2.65,7,1000))
+    motion_sensor.reset_yaw(0)
+    runloop.run(movement(1,500,500))
+    runloop.run(turnright(650))
+    runloop.run(movement(100,500,500))
+    time.sleep_ms(200)
+    runloop.run(line_following_task_intersection(2,0.01,0.9,1,700))
+    runloop.run(movement(70,500,500))
+    runloop.run(close_grabber(200,150))
+    runloop.run(package_dropped_sound())
+    motion_sensor.reset_yaw(0)
+    runloop.run(movement(190,-500,-500))
+    runloop.run(turnright(1700))
+    time.sleep_ms(200)
+    runloop.run(line_following_task_intersection(2,0.01,1.5,1,700))
+    motion_sensor.reset_yaw(0)
+    runloop.run(movement(70,500,500))
+    runloop.run(turnright(850))
+    time.sleep_ms(200)
+    runloop.run(curved_road_linefollowing2(1.1,10,1000))
+    motion_sensor.reset_yaw(0)
+    runloop.run(movement(500,900,900))
+    runloop.run(turnright(400))
+    time.sleep_ms(300)
+    motion_sensor.reset_yaw(0)
+    runloop.run(line_following_task(1.8,0.01,0.9,650,700))
+    runloop.run(left(100))
+    runloop.run(movement(40,900,0))
+    time.sleep_ms(100)
+    runloop.run(gyro_straight(1000,700,2))
+    motion_sensor.reset_yaw(0)
+    runloop.run(line_following_task(1.8,0.01,0.9,500,700))
+    runloop.run(turnright(850))
+
+
+async def b1_to_a3_fast():
+    runloop.run(gyro_straight(600,600,0.7))
+    motion_sensor.reset_yaw(0)
+    runloop.run(curved_road_linefollowing2(0.7,8,700))
+    time.sleep_ms(200)
+    runloop.run(left(300))
+    time.sleep_ms(200)
+    runloop.run(line_following_task_intersection(2,0.01,1.5,1,700))
+    runloop.run(movement(100,500,500))
+    runloop.run(close_grabber(-200,200))
+    motion_sensor.reset_yaw(0)
+    runloop.run(movement(100,-500,-500))
+    runloop.run(left(1750))
+    time.sleep_ms(200)
+    motion_sensor.reset_yaw(0)
+    runloop.run(line_following_task_intersection(1.8,0.01,0.9,1,700))
+    time.sleep_ms(200)
+    runloop.run(left(500))
+    runloop.run(movement(150,500,500))
+    runloop.run(line_following_task_intersection_turn(2,0.01,0.9,2,800,2))
+    runloop.run(line_following_task_intersection_turn(2,0.01,0.9,1,800,2))
+    runloop.run(line_following_task_intersection(2,0.01,1.5,1,700))
+    runloop.run(movement(50,500,500))
+    runloop.run(close_grabber(200,200))
+    runloop.run(package_dropped_sound())
+    motion_sensor.reset_yaw(0)
+    runloop.run(movement(190,-500,-500))
+    runloop.run(left(1750))
+    time.sleep_ms(200)
+    runloop.run(line_following_task_intersection_turn(2,0.01,0.9,1,800,2))
+    runloop.run(line_following_task_intersection(2,0.01,1.5,1,700))
+    motion_sensor.reset_yaw(0)
+    runloop.run(gyro_straight(250,900,2))
+    time.sleep_ms(100)
+    runloop.run(left(1750))    
+
+
+
+
+
+
+
+#runloop.run(obstacle_detection())
+#runloop.run(package_detection())
+#runloop.run(package_dropped_sound())
+#speed up first curved road linefollowing for start to c3.. curent speed is 700 target is 1000
+
+#runloop.run(gyro_straight(900,700,2))
+#runloop.run(curved_road_linefollowing2(1.2,2,700))
+
+#runloop.run(line_following_multiple_intersection_turns(2,0.01,0.9,700,2,2,1,1,1,0,0,0,))
+#runloop.run(onsite_grab(4))
+
+#runloop.run(line_following_task_intersection(2,0.01,0.9,1,700))
+#runloop.run(get_out_of_reset(2))
+
+#runloop.run(start_to_c3_fast())
+#runloop.run(line_following_task_intersection(1.6,0.1,0,2,700))
+
+runloop.run(b1_to_a3_fast())
